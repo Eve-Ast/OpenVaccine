@@ -1,0 +1,16 @@
+# Données Kaggle (trop lourdes pour git, à télécharger par chacun)
+data/
+
+# Résultats d'entraînement (partager seulement scores.json si besoin)
+outputs/
+*.keras
+*.h5
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
