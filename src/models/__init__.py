@@ -1,8 +1,8 @@
-from . import conv_gru, gnn, gru, transformer
+from . import gat, gcn, mlp, transformer
 
 MODELS = {
-    "gru": gru.build_model,               # Modèle 1  - Personne 1
-    "conv_gru": conv_gru.build_model,     # Modèle 2  - Personne 2
-    "transformer": transformer.build_model,  # Modèle 3a - Personne 2
-    "gnn": gnn.build_model,               # Modèle 3b - Personne 3
+    "mlp": mlp.build_model,                  # Modèle 1 : baseline, chaque base seule
+    "transformer": transformer.build_model,  # Modèle 2 : self-attention (+ biais BPPS)
+    "gcn": gcn.build_model,                  # Modèle 3 : GCN (option relational=True : R-GCN)
+    "gat": gat.build_model,                  # Modèle 4 (optionnel) : attention sur graphe
 }

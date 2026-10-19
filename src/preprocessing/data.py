@@ -6,7 +6,7 @@ Toutes les molécules d'un même batch ont la même longueur (107 en train,
 import numpy as np
 import pandas as pd
 
-from . import config as C
+from .. import config as C
 from .features import base_features, pair_index
 
 
@@ -53,23 +53,60 @@ def build_inputs(df):
     """Dictionnaire d'entrées commun à tous les modèles.
 
     tokens : (N, L, 3)  int    -> Embedding
+    onehot : (N, L, 14) float  -> one-hot des 3 entrées texte
     feats  : (N, L, F)  float  -> features numériques par base (features.py)
     bpps   : (N, L, L)  float  -> matrice BPPS (Transformer / GNN)
     pairs  : (N, L)     int    -> index de la base appariée, -1 sinon (GNN)
     """
     assert df.seq_length.nunique() == 1, "grouper les molécules par longueur"
     bpps = load_bpps(df.id)
+    tokens = encode_tokens(df)
     return {
-        "tokens": encode_tokens(df),
+        "tokens": tokens,
+        "onehot": one_hot(tokens),
         "feats": base_features(df, bpps),
         "bpps": bpps,
         "pairs": np.asarray([pair_index(s) for s in df.structure], dtype="int32"),
     }
 
 
+def one_hot(tokens):
+    """(N, L, 14) : one-hot de la base (4), de la structure (3) et de la boucle (7).
+
+    Alternative à l'Embedding pour les modèles sans couche Embedding
+    (baselines tabulaires, MLP).
+    """
+    return np.eye(C.VOCAB_SIZE, dtype="float32")[tokens].sum(axis=2)
+
+
 def build_targets(df):
     """(N, 68, 5) dans l'ordre de config.TARGETS."""
     return np.stack([np.asarray(df[t].tolist(), dtype="float32") for t in C.TARGETS], axis=-1)
+
+
+def build_errors(df):
+    """(N, 68, 5) : incertitude expérimentale de chaque cible."""
+    return np.stack([np.asarray(df[e].tolist(), dtype="float32") for e in C.ERROR_COLS], axis=-1)
+
+
+# ------------------------------------------------------------------
+# Données prétraitées (écrites par preprocess.py)
+# ------------------------------------------------------------------
+def load_processed(name):
+    """name = 'train', 'test_107' ou 'test_130' -> dict de tableaux numpy."""
+    path = C.PROCESSED_DIR / f"{name}.npz"
+    if not path.exists():
+        raise FileNotFoundError(f"{path} absent : lancer d'abord `python preprocess.py`")
+    with np.load(path, allow_pickle=False) as z:
+        return {k: z[k] for k in z.files}
+
+
+INPUT_KEYS = ["tokens", "onehot", "feats", "bpps", "pairs"]
+
+
+def inputs_of(processed):
+    """Garde seulement les entrées des modèles d'un dictionnaire prétraité."""
+    return {k: processed[k] for k in INPUT_KEYS}
 
 
 def select(inputs, idx, keys=None):

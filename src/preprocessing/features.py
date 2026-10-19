@@ -1,9 +1,11 @@
 """Feature engineering par base (Personne 1).
 
-Ajouter ici les nouvelles features : elles arrivent automatiquement dans
-l'entrée `feats` de tous les modèles.
+Ajouter ici les nouvelles features (et leur nom dans FEATURE_NAMES) : elles
+arrivent automatiquement dans l'entrée `feats` de tous les modèles.
 """
 import numpy as np
+
+FEATURE_NAMES = ["bpp_sum", "bpp_max", "bpp_entropy", "pair_distance"]
 
 
 def pair_index(structure):
@@ -15,15 +17,22 @@ def pair_index(structure):
         elif c == ")":
             j = stack.pop()
             pairs[i], pairs[j] = j, i
+    if stack:
+        raise ValueError("structure non équilibrée")
     return pairs
 
 
 def bpps_features(bpps):
-    """(N, L, 3) : somme, max, et probabilité de ne pas être appariée."""
+    """(N, L, 3) : probabilité d'être appariée (somme), probabilité max, entropie.
+
+    L'entropie inclut l'état « non appariée » (1 - somme) : elle est faible
+    quand la base a un partenaire (ou une absence de partenaire) bien défini.
+    """
     s = bpps.sum(axis=2)
     m = bpps.max(axis=2)
-    unpaired = 1.0 - s
-    return np.stack([s, m, unpaired], axis=-1)
+    p = np.concatenate([bpps, np.clip(1.0 - s, 0, 1)[..., None]], axis=2)
+    entropy = -(p * np.log(p + 1e-12)).sum(axis=2)
+    return np.stack([s, m, entropy], axis=-1)
 
 
 def pair_distance(df):

@@ -11,19 +11,19 @@ import pandas as pd
 from scipy.optimize import minimize
 
 from src import config as C
-from src.data import build_targets, load_train
-from src.metrics import mcrmse
+from src.evaluation.metrics import mcrmse
+from src.preprocessing.data import load_processed
 
 p = argparse.ArgumentParser()
 p.add_argument("--runs", nargs="+", required=True, help="dossiers dans outputs/")
 p.add_argument("--name", default="ensemble")
 args = p.parse_args()
 
-train = load_train()
-Y = build_targets(train)
+train = load_processed("train")
+Y = train["targets"]
 oofs = [np.load(C.OUTPUT_DIR / r / "oof.npy") for r in args.runs]
 # molécules fiables et prédites par tous les modèles (tous les folds entraînés)
-clean = (train.SN_filter == 1).to_numpy() & np.all([~np.isnan(o).any(axis=(1, 2)) for o in oofs], axis=0)
+clean = (train["sn_filter"] == 1) & np.all([~np.isnan(o).any(axis=(1, 2)) for o in oofs], axis=0)
 print(f"{clean.sum()} molécules utilisées pour l'évaluation")
 oofs = [o[clean] for o in oofs]
 for r, o in zip(args.runs, oofs):

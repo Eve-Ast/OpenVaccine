@@ -2,7 +2,7 @@
 import numpy as np
 from keras import ops
 
-from . import config as C
+from .. import config as C
 
 
 def mcrmse(y_true, y_pred, cols=C.SCORED_IDX):

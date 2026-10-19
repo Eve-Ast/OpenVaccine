@@ -1,7 +1,7 @@
 """Conversion des prédictions au format Kaggle (id_seqpos + 5 colonnes)."""
 import pandas as pd
 
-from . import config as C
+from .. import config as C
 
 
 def to_submission(ids, preds):

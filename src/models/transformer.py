@@ -1,4 +1,4 @@
-"""Modèle 3a (Personne 2) : Transformer dont l'attention est biaisée par la BPPS.
+"""Modèle 2 : Transformer Encoder ; au niveau "graph", l'attention est biaisée par la BPPS.
 
 scores = Q K^T / sqrt(d) + w_h * BPPS     (un poids w_h appris par tête)
 
@@ -8,7 +8,7 @@ au modèle quelles positions interagissent en 3D.
 import keras
 from keras import layers, ops
 
-from .common import embed, model_inputs, output_head
+from .common import embed, model_inputs, output_head, used_inputs
 
 
 class SinusoidalPositionEncoding(layers.Layer):
@@ -34,7 +34,7 @@ class BppsAttention(layers.Layer):
     def build(self, input_shape):
         self.bpps_weight = self.add_weight(shape=(self.h,), initializer="ones", name="bpps_weight")
 
-    def call(self, x, bpps):
+    def call(self, x, bpps=None):
         B, L = ops.shape(x)[0], ops.shape(x)[1]
         qkv = ops.reshape(self.qkv(x), (B, L, 3, self.h, self.dk))
         q, k, v = [ops.transpose(qkv[:, :, i], (0, 2, 1, 3)) for i in range(3)]  # (B, h, L, dk)
@@ -46,18 +46,19 @@ class BppsAttention(layers.Layer):
         return self.out(ops.reshape(y, (B, L, self.d_model)))
 
 
-def build_model(n_feats, embed_dim=32, d_model=128, num_heads=8, n_layers=4,
-                ff_dim=256, dropout=0.1, use_bpps=True):
+def build_model(n_feats, level="graph", embed_dim=32, d_model=128, num_heads=8, n_layers=4,
+                ff_dim=256, dropout=0.1):
+    """level = "graph" : la BPPS biaise l'attention ; sinon self-attention classique."""
     inputs = model_inputs(n_feats)
-    x = layers.Dense(d_model)(embed(inputs, embed_dim))
+    use_bpps = level == "graph"
+    x = layers.Dense(d_model)(embed(inputs, embed_dim, level))
     x = SinusoidalPositionEncoding()(x)
 
     for _ in range(n_layers):
-        a = BppsAttention(d_model, num_heads, use_bpps)(x, inputs["bpps"])
+        a = BppsAttention(d_model, num_heads, use_bpps)(x, inputs["bpps"] if use_bpps else None)
         x = layers.LayerNormalization()(x + layers.Dropout(dropout)(a))
         f = layers.Dense(ff_dim, activation="gelu")(x)
         f = layers.Dense(d_model)(f)
         x = layers.LayerNormalization()(x + layers.Dropout(dropout)(f))
 
-    used = {k: inputs[k] for k in ["tokens", "feats", "bpps"]}
-    return keras.Model(used, output_head(x), name="transformer")
+    return keras.Model(used_inputs(inputs, level), output_head(x), name=f"transformer_{level}")

@@ -1,8 +1,8 @@
 """Découpage train / validation (Personne 1).
 
-Usage : python -m src.folds
-Écrit folds/folds_kfold.csv et folds/folds_group.csv, à committer : toute
-l'équipe utilise exactement les mêmes folds.
+Appelé par preprocess.py : crée folds/folds_kfold.csv et folds/folds_group.csv
+s'ils n'existent pas. Ces fichiers sont committés et ne sont jamais
+régénérés : toute l'équipe utilise exactement les mêmes folds.
 
 - kfold : KFold classique.
 - group : GroupKFold sur des clusters de séquences similaires (KMeans sur les
@@ -16,8 +16,7 @@ import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.model_selection import GroupKFold, KFold
 
-from . import config as C
-from .data import load_train
+from .. import config as C
 
 KMERS = ["".join(p) for p in product(C.SEQ_VOCAB, repeat=3)]
 
@@ -48,10 +47,11 @@ def load_folds(name="kfold"):
     return pd.read_csv(C.FOLDS_DIR / f"folds_{name}.csv")
 
 
-if __name__ == "__main__":
-    train = load_train()
+def ensure_folds(train):
+    """Crée les fichiers de folds manquants ; ne touche jamais aux fichiers existants."""
     C.FOLDS_DIR.mkdir(exist_ok=True)
     for strategy in ["kfold", "group"]:
-        folds = make_folds(train, strategy)
-        folds.to_csv(C.FOLDS_DIR / f"folds_{strategy}.csv", index=False)
-        print(strategy, folds.fold.value_counts().sort_index().tolist())
+        path = C.FOLDS_DIR / f"folds_{strategy}.csv"
+        if not path.exists():
+            make_folds(train, strategy).to_csv(path, index=False)
+            print(f"folds créés : {path}")

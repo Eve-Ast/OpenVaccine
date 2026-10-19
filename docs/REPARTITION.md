@@ -6,13 +6,13 @@
 | **P2** | _______ | `p2-sequence` | Modèles séquentiels (Modèle 2, Transformer) et optimisation |
 | **P3** | _______ | `p3-graph` | GNN, analyse d'erreurs, ensembling, résultats finaux |
 
-Règle d'or : **mêmes folds, même MCRMSE, même protocole pour tous les modèles**. Sinon les scores ne sont pas comparables (cours PLM : *« comparer exige le même readout, le même split et le même budget »*).
+Tous les modèles utilisent les mêmes folds, la métrique MCRMSE et le même protocole de validation pour permettre la comparaison des scores.
 
 ---
 
 ## 1. Travail technique
 
-### 👤 P1 : Données, Validation et Modèle 1
+### P1 : Données, validation et Modèle 1
 
 | Tâche | Fichiers |
 |---|---|
@@ -26,7 +26,7 @@ Règle d'or : **mêmes folds, même MCRMSE, même protocole pour tous les modèl
 - *Introduction ML/DL* : protocole ML, K-fold, métriques de régression, comparaison à un prédicteur naïf
 - *PLM* : embeddings, séparation des homologues pour éviter la fuite d'information
 
-### 👤 P2 : Modèles séquentiels et Optimisation
+### P2 : Modèles séquentiels et optimisation
 
 | Tâche | Fichiers |
 |---|---|
@@ -41,7 +41,7 @@ Règle d'or : **mêmes folds, même MCRMSE, même protocole pour tous les modèl
 - *Transformers* et *Transformers2* : attention, encodage positionnel, TP de prédiction de structure secondaire
 - *Introduction ML/DL* : convolution 1D sur les séquences
 
-### 👤 P3 : GNN, Analyse d'erreurs, Ensembling
+### P3 : GNN, analyse d'erreurs et ensembling
 
 | Tâche | Fichiers |
 |---|---|
@@ -111,7 +111,7 @@ Environ 6 minutes par personne, suivies des questions. Chacun répond aux questi
 2. Transformer : schéma de l'attention, et comment la BPPS biaise l'attention
 3. Ablation avec et sans BPPS : l'information structurelle aide-t-elle ?
 4. Étude d'optimisation : courbes de loss des optimiseurs, ratio lr/batch
-5. Ce qu'on retient (le meilleur réglage)
+5. Réglage retenu et justification
 
 ### P3 : « Graphe, ensemble et résultats » (≈ 6 min)
 1. L'ARN comme graphe : schéma des 3 types d'arêtes
@@ -123,7 +123,7 @@ Environ 6 minutes par personne, suivies des questions. Chacun répond aux questi
 
 ---
 
-## 4. Planning (à adapter à la date de rendu)
+## 4. Planning prévisionnel
 
 | Semaine | P1 | P2 | P3 |
 |---|---|---|---|

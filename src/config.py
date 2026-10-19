@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 BPPS_DIR = DATA_DIR / "bpps"
+PROCESSED_DIR = DATA_DIR / "processed"
 FOLDS_DIR = ROOT / "folds"
 OUTPUT_DIR = ROOT / "outputs"
 
@@ -12,6 +13,8 @@ TARGETS = ["reactivity", "deg_Mg_pH10", "deg_pH10", "deg_Mg_50C", "deg_50C"]
 # Les 3 cibles évaluées par Kaggle (MCRMSE)
 SCORED_TARGETS = ["reactivity", "deg_Mg_pH10", "deg_Mg_50C"]
 SCORED_IDX = [TARGETS.index(t) for t in SCORED_TARGETS]  # [0, 1, 3]
+# Incertitude expérimentale de chaque cible (même ordre que TARGETS)
+ERROR_COLS = ["reactivity_error", "deg_error_Mg_pH10", "deg_error_pH10", "deg_error_Mg_50C", "deg_error_50C"]
 
 SEQ_SCORED = 68  # seules les 68 premières bases sont annotées dans train
 
