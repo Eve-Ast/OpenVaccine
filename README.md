@@ -40,7 +40,7 @@ Les fichiers JSON compressés en `.json.zip` sont également acceptés. Le prét
 python preprocess.py
 ```
 
-Les folds fournis dans `folds/` sont communs à toutes les expériences et doivent être conservés.
+Les folds fournis dans `folds/` sont communs à toutes les expériences : le prétraitement les lit par identifiant, sans les recréer. Il encode la base, la structure et le type de boucle, puis calcule quatre caractéristiques par position (somme, maximum et entropie BPPS, distance au partenaire). Les cibles restent inchangées. Les contrôles portent sur les identifiants, les longueurs, les caractères, les appariements et les valeurs BPPS.
 
 ## Entraînement et évaluation
 
@@ -58,13 +58,12 @@ python train.py --model gru --level annot --only-fold 0 \
 Pour reproduire la comparaison complète :
 
 ```bash
-python experiments/run_comparison.py
-python experiments/run_comparison.py --five-fold --reuse-pilots --jobs 2
+python experiments/run_comparison.py --jobs 2
 python experiments/verify_outputs.py
 python experiments/summarize.py
 ```
 
-La seconde commande réutilise les folds 0 compatibles et entraîne les quatre autres folds. Les configurations, historiques, meilleurs poids et prédictions OOF sont enregistrés dans `outputs/`. Les expériences existantes ne sont pas écrasées.
+La commande entraîne les dix configurations sur cinq folds et ignore celles déjà terminées avec les mêmes paramètres. Les configurations, historiques, meilleurs poids et prédictions OOF sont enregistrés dans `outputs/`. Les expériences existantes ne sont pas écrasées.
 
 Les tests de dimensions, gradients et checkpoints se lancent avec :
 
@@ -80,11 +79,6 @@ Ces résultats concernent nos configurations et notre budget d’entraînement. 
 
 ![Comparaison des architectures sur cinq folds](figures/cv_architectures.png)
 
-Les autres figures sont dans [`figures/`](figures/), notamment :
+Le dossier [`figures/`](figures/) contient uniquement les trois figures du rapport : la comparaison des architectures ci-dessus, la [contribution des informations structurales](figures/cv_structure.png) et l’[erreur par cible](figures/cv_targets.png). La commande `python experiments/summarize.py` les régénère à partir des validations croisées terminées. Les historiques et prédictions OOF sont conservés dans `outputs/` pour vérifier les résultats, sans produire de graphiques supplémentaires.
 
-- [Contribution des informations structurales](figures/cv_structure.png)
-- [Erreur par cible](figures/cv_targets.png)
-- [Courbes d’apprentissage du BiGRU](figures/cv_gru_annot_learning.png)
-- [Valeurs réelles et prédites par le BiGRU](figures/cv_gru_annot_actual_predicted.png)
-
-Les données, poids, tableaux de résultats et notes locales ne sont pas versionnés.
+Les données, poids et sorties locales dans `outputs/` ne sont pas versionnés.

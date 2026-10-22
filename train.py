@@ -8,7 +8,6 @@ import argparse
 import inspect
 import json
 import os
-import shutil
 import time
 
 os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "4")
@@ -27,11 +26,6 @@ from src.models.mean import MeanBaseline
 from src.preprocessing.data import inputs_of, load_processed, select
 
 OPTIMIZERS = {
-    "sgd": lambda lr: keras.optimizers.SGD(lr),
-    "momentum": lambda lr: keras.optimizers.SGD(lr, momentum=0.9),
-    "nesterov": lambda lr: keras.optimizers.SGD(lr, momentum=0.9, nesterov=True),
-    "adagrad": lambda lr: keras.optimizers.Adagrad(lr),
-    "rmsprop": lambda lr: keras.optimizers.RMSprop(lr),
     "adam": lambda lr: keras.optimizers.Adam(lr),
     "adamw": lambda lr: keras.optimizers.AdamW(lr, weight_decay=1e-4),
 }
@@ -48,11 +42,10 @@ def parse_args():
     p.add_argument("--optimizer", default="adamw", choices=OPTIMIZERS)
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--batch-size", type=int, default=32)
-    p.add_argument("--epochs", type=int, default=100)
-    p.add_argument("--patience", type=int, default=10)
+    p.add_argument("--epochs", type=int, default=40)
+    p.add_argument("--patience", type=int, default=8)
     p.add_argument("--seed", type=int, default=C.SEED)
-    p.add_argument("--skip-test", action="store_true", help="pilote sans inférence test")
-    p.add_argument("--reuse-pilot", help="réutiliser le fold 0 d'un pilote identique (avec --skip-test)")
+    p.add_argument("--skip-test", action="store_true", help="sans inférence sur le test Kaggle")
     p.add_argument("--all-samples", action="store_true")
     args = p.parse_args()
     if min(args.batch_size, args.epochs, args.patience) < 1 or args.lr <= 0:
@@ -121,43 +114,9 @@ def main():
     test_preds = [np.zeros((*g["pairs"].shape, len(C.TARGETS)), dtype="float32") for g in test_groups]
     oof = np.full_like(Y, np.nan)
     fold_scores, details = {}, {}
-    previous_seconds = 0.0
-    if args.reuse_pilot:
-        if not args.skip_test or args.only_fold is not None:
-            raise ValueError("--reuse-pilot exige --skip-test et une évaluation à cinq folds")
-        source = C.OUTPUT_DIR / args.reuse_pilot
-        saved = json.loads((source / "scores.json").read_text())
-        for key in ("model", "level", "folds", "optimizer", "lr", "batch_size", "epochs",
-                    "patience", "seed", "skip_test", "all_samples"):
-            if saved["args"][key] != getattr(args, key):
-                raise ValueError(f"pilote incompatible : {key}")
-        if json.loads(saved["args"]["params"]) != params:
-            # level est passé séparément dans --level.
-            source_params = json.loads(saved["args"]["params"])
-            if dict(source_params, level=saved["args"]["level"]) != params:
-                raise ValueError("hyperparamètres du pilote incompatibles")
-        if set(saved["fold_mcrmse"]) != {"0"} or saved["args"]["only_fold"] != 0:
-            raise ValueError("le pilote doit contenir uniquement le fold 0")
-        restored = np.load(source / "oof.npy")
-        held_out = fold == 0
-        if (restored.shape != Y.shape or not np.isfinite(restored[held_out]).all()
-                or not np.isnan(restored[~held_out]).all()):
-            raise ValueError("couverture OOF du pilote incompatible")
-        score = mcrmse(Y[held_out & clean], restored[held_out & clean])
-        if not np.isclose(score, saved["fold_mcrmse"]["0"], atol=1e-7, rtol=0):
-            raise ValueError("le score du pilote ne correspond pas aux données actuelles")
-        for filename in ("fold0.weights.h5", "history_fold0.csv"):
-            shutil.copy2(source / filename, out_dir / filename)
-        oof = restored
-        fold_scores = {0: saved["fold_mcrmse"]["0"]}
-        details = {0: dict(saved["fold_details"]["0"], reused_from=args.reuse_pilot)}
-        previous_seconds = saved["duration_seconds"]
-        print(f"Fold 0 réutilisé : {source}", flush=True)
     (out_dir / "config.json").write_text(json.dumps({"args": vars(args), "model_params": effective}, indent=2))
 
     for k in folds:
-        if k in fold_scores:
-            continue
         keras.backend.clear_session()
         keras.utils.set_random_seed(args.seed)
         fold_started = time.perf_counter()
@@ -183,7 +142,7 @@ def main():
                 callbacks=[
                     ValidationScore(xv, Y[va], args.batch_size),
                     keras.callbacks.ModelCheckpoint(out_dir / f"fold{k}.weights.h5", monitor="val_mcrmse", mode="min", save_best_only=True, save_weights_only=True),
-                    keras.callbacks.EarlyStopping(monitor="val_mcrmse", mode="min", patience=args.patience, restore_best_weights=True),
+                    keras.callbacks.EarlyStopping(monitor="val_mcrmse", mode="min", patience=args.patience),
                     keras.callbacks.ReduceLROnPlateau(monitor="val_mcrmse", mode="min", factor=0.5, patience=max(1, args.patience // 2)),
                     keras.callbacks.CSVLogger(out_dir / f"history_fold{k}.csv"),
                     keras.callbacks.TerminateOnNaN(),
@@ -219,8 +178,8 @@ def main():
             "rmse_per_target": dict(zip(C.TARGETS, per_target.tolist())),
             "fold_details": details, "model_params": effective, "n_feats": n_feats,
             "seed": args.seed, "args": vars(args),
-            "duration_seconds": previous_seconds + time.perf_counter() - started,
-            "reused_pilot": args.reuse_pilot,
+            "duration_seconds": time.perf_counter() - started,
+            "reused_pilot": None,
             "versions": {"keras": keras.__version__, "tensorflow": tf.__version__},
             "devices": [d.name for d in tf.config.list_physical_devices()],
         }
