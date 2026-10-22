@@ -10,9 +10,9 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from experiments.run_comparison import MATRIX
+from experiments.from_scratch.run import MATRIX
 from src import config as C
 
 LABELS = {'gru': 'BiGRU', 'conv_gru': 'Conv1D + BiGRU', 'attention_gru': 'BiGRU + Attention',
@@ -36,7 +36,7 @@ def load_results():
 
 def save(fig, name):
     fig.tight_layout()
-    fig.savefig(ROOT / 'figures' / name, dpi=170)
+    fig.savefig(ROOT / 'figures' / 'from_scratch' / name, dpi=170)
     plt.close(fig)
 
 
@@ -83,11 +83,11 @@ def main():
     if results.empty:
         print('Aucune validation croisée à cinq folds terminée.')
         return
-    (ROOT / 'figures').mkdir(exist_ok=True)
+    (ROOT / 'figures' / 'from_scratch').mkdir(parents=True, exist_ok=True)
     plot_architectures(results)
     plot_structure(results)
     plot_targets(results)
-    print(f'Trois figures mises à jour dans figures/ ({len(results)} configurations).')
+    print(f'Trois figures mises à jour dans figures/from_scratch/ ({len(results)} configurations).')
 
 
 if __name__ == '__main__':

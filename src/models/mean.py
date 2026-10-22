@@ -1,7 +1,7 @@
 """Prédicteur naïf : moyenne de chaque cible par position.
 
 Point de référence (aucun apprentissage) : tout modèle doit faire mieux.
-    python train.py --model mean
+    python -m experiments.from_scratch.train --model mean
 """
 import numpy as np
 

@@ -1,10 +1,10 @@
 """Fine-tuning de l'encodeur pré-entraîné (Stratégie 2, Personne C).
-Mêmes options et mêmes sorties que train.py -> compatible avec ensemble.py.
+Folds et format de sortie communs au projet ; compatible avec scripts/ensemble.py.
 
-    python train_tl.py --folds group                          # outputs/tl/
-    python train_tl.py --folds group --ckpt none              # ablation : même archi sans pré-entraînement -> outputs/tl_scratch/
-    python train_tl.py --folds group --label-frac 0.25 --name tl_25
-    python train_tl.py --only-fold 0 --epochs 2               # test rapide
+    python -m experiments.transfer.finetune --folds group                          # outputs/tl/
+    python -m experiments.transfer.finetune --folds group --ckpt none              # ablation : même archi sans pré-entraînement -> outputs/tl_scratch/
+    python -m experiments.transfer.finetune --folds group --label-frac 0.25 --name tl_25
+    python -m experiments.transfer.finetune --only-fold 0 --epochs 2               # test rapide
 
 Sorties dans outputs/<name>/ : oof.npy, submission.csv, scores.json, history_fold*.csv, model_fold*.pt
 """
@@ -16,7 +16,7 @@ from src.transfer.mlm import DEFAULT_CKPT
 
 def parse_args():
     p = argparse.ArgumentParser()
-    # ---- options identiques à train.py
+    # ---- options identiques à experiments/from_scratch/train.py
     p.add_argument("--name", help="dossier de sortie (défaut : tl, ou tl_scratch avec --ckpt none)")
     p.add_argument("--folds", default="kfold", choices=["kfold", "group"])
     p.add_argument("--only-fold", type=int, help="n'entraîner qu'un fold (tests rapides)")

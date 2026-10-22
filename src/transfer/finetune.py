@@ -1,13 +1,8 @@
-"""Fine-tuning en validation croisée, calqué ligne à ligne sur train.py.
+"""Fine-tuning du Transformer MLM sur les folds communs du projet.
 
-Identique à train.py : données prétraitées, folds (--folds), molécules d'entraînement
-(SN_filter = 1 sauf --all-samples), validation sur SN_filter = 1, loss MCRMSE sur les
-5 cibles, EarlyStopping(patience, restore_best_weights) sur la val_loss,
-ReduceLROnPlateau(0.5, patience // 2), Adam, et sorties dans outputs/<name>/ :
-oof.npy (NaN hors folds entraînés), submission.csv, scores.json, history_fold*.csv.
-
-Spécifique au transfer learning : chargement de l'encodeur pré-entraîné, gel de
-l'encodeur pendant --freeze-epochs, learning rate séparé pour l'encodeur (--lr-enc).
+Loss sur cinq cibles ; checkpoint et arrêt anticipé sélectionnés sur la
+validation à cinq cibles. Le score officiel à trois cibles est aussi enregistré.
+L'encodeur préentraîné peut être gelé au début et utilise un learning rate séparé.
 """
 import copy
 import json
@@ -63,7 +58,7 @@ def run(args):
     seed_all()
     rng = np.random.default_rng(C.SEED)
 
-    # données prétraitées par preprocess.py (comme train.py)
+    # données prétraitées par scripts/preprocess.py (comme experiments/from_scratch/train.py)
     train = load_processed("train")
     X, Y = load_inputs("train"), train["targets"]
     fold = train[f"fold_{args.folds}"]
@@ -94,7 +89,7 @@ def run(args):
         if pretrained:
             enc.load_state_dict(torch.load(args.ckpt, map_location="cpu"))
         model = RegModel(enc).to(DEVICE)
-        lr_enc = args.lr_enc if pretrained else args.lr   # sans pré-entraînement : protocole train.py
+        lr_enc = args.lr_enc if pretrained else args.lr   # sans pré-entraînement : protocole experiments/from_scratch/train.py
         opt = torch.optim.Adam([{"params": model.enc.parameters(), "lr": lr_enc},
                                 {"params": model.head.parameters(), "lr": args.lr}])
         plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(   # = keras ReduceLROnPlateau

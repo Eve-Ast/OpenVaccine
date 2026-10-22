@@ -1,8 +1,8 @@
-"""Préparer les données : python preprocess.py.
+"""Préparer les données : python -m scripts.preprocess.
 
 Lit les données Kaggle, encode les entrées et conserve les folds du dépôt.
 Écrit train.npz, test_107.npz et test_130.npz dans data/processed/.
-Le filtre SN_filter est appliqué ensuite dans train.py, sans modifier les cibles.
+Le filtre SN_filter est appliqué ensuite dans experiments/from_scratch/train.py, sans modifier les cibles.
 """
 import numpy as np
 

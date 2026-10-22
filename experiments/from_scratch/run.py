@@ -1,6 +1,6 @@
 """Expériences contrôlées sans régénération des folds ni écrasement des résultats.
 
-python experiments/run_comparison.py --jobs 2
+python -m experiments.from_scratch.run --jobs 2
 Chaque configuration utilise les cinq folds fixes, sans données de test.
 """
 import argparse
@@ -11,7 +11,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MATRIX = [
     ("gru", "seq", {"hidden": 64, "n_layers": 2, "dropout": .2}),
     ("gru", "annot", {"hidden": 64, "n_layers": 2, "dropout": .2}),
@@ -39,7 +39,7 @@ def run_config(entry, args, env):
             print(f'Already completed: {name}', flush=True)
             return name
         raise RuntimeError(f'Run incomplet ou configuration différente : {out}')
-    command = [sys.executable, '-B', 'train.py', '--model', model, '--level', level,
+    command = [sys.executable, '-B', '-m', 'experiments.from_scratch.train', '--model', model, '--level', level,
                '--params', json.dumps(params), '--name', name, '--epochs', str(args.epochs),
                '--patience', '8', '--batch-size', '32', '--optimizer', 'adamw', '--lr', '0.001', '--skip-test']
     print(f'Starting {name}', flush=True)
@@ -62,7 +62,7 @@ def main():
         futures = [pool.submit(run_config, x, args, env) for x in selected]
         for f in as_completed(futures):
             f.result()
-    subprocess.run([sys.executable, '-B', 'experiments/summarize.py'], cwd=ROOT, env=env, check=True)
+    subprocess.run([sys.executable, '-B', '-m', 'experiments.from_scratch.figures'], cwd=ROOT, env=env, check=True)
 
 
 if __name__ == '__main__':

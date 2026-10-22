@@ -94,13 +94,13 @@ def build_errors(df):
 
 
 # ------------------------------------------------------------------
-# Données prétraitées (écrites par preprocess.py)
+# Données prétraitées (écrites par scripts/preprocess.py)
 # ------------------------------------------------------------------
 def load_processed(name):
     """name = 'train', 'test_107' ou 'test_130' -> dict de tableaux numpy."""
     path = C.PROCESSED_DIR / f"{name}.npz"
     if not path.exists():
-        raise FileNotFoundError(f"{path} absent : lancer d'abord `python preprocess.py`")
+        raise FileNotFoundError(f"{path} absent : lancer d'abord `python -m scripts.preprocess`")
     with np.load(path, allow_pickle=False) as z:
         return {k: z[k] for k in z.files}
 

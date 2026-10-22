@@ -1,13 +1,13 @@
 """Figures du rapport (Stratégie 2), générées à partir des fichiers déjà produits.
 
-    python make_figures.py                                   # runs tl, tl_scratch, mean
-    python make_figures.py --runs tl tl_scratch gru gnn mean # avec les modèles de l'équipe
+    python -m experiments.transfer.figures                                   # runs tl, tl_scratch, mean
+    python -m experiments.transfer.figures --runs tl tl_scratch gru gnn mean # avec les modèles de l'équipe
 
 Lit :
-    outputs/mlm_pretrain/history.csv           (pretrain_mlm.py)
-    outputs/<run>/scores.json                  (train.py / train_tl.py)
-    report/comparison/loop_errors_<run>.csv    (python -m src.evaluation.compare --runs ...)
-Écrit dans report/figures/ (PNG, 200 dpi) :
+    outputs/mlm_pretrain/history.csv           (experiments/transfer/preexperiments/from_scratch/train.py)
+    outputs/<run>/scores.json                  (experiments/from_scratch/train.py / experiments/transfer/finetune.py)
+    results/transfer/loop_errors_<run>.csv    (python -m experiments.transfer.compare --runs ...)
+Écrit dans figures/transfer/ (PNG, 200 dpi) :
     fig_pretraining.png      précision sur les bases masquées + perte MLM
     fig_targets.png          RMSE par cible et par modèle
     fig_loop_gain.png        gain relatif à la référence mean, par type de boucle
@@ -36,7 +36,7 @@ RUN_COLORS = {"tl": "#2a6fdb", "tl_scratch": "#9aa0a6", "mean": "#d4d4d4"}
 OTHER_COLORS = ["#e07b39", "#3a9d5d", "#8e5cc4", "#c94f6d"]
 BLUE, GREY = "#2a6fdb", "#7a7f85"
 SCORED = [C.TARGETS[i] for i in C.SCORED_IDX]
-FIG_DIR = C.ROOT / "report" / "figures"
+FIG_DIR = C.ROOT / "figures" / "transfer"
 
 
 def fr(v, nd=3):
@@ -80,7 +80,7 @@ def load_scores(run):
 
 
 def load_loops(run):
-    p = C.ROOT / "report" / "comparison" / f"loop_errors_{run}.csv"
+    p = C.ROOT / "results" / "transfer" / f"loop_errors_{run}.csv"
     return pd.read_csv(p).set_index("loop") if p.exists() else None
 
 

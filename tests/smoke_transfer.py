@@ -1,6 +1,6 @@
 """Test rapide de la stratégie 2 sur un petit sous-ensemble des données prétraitées.
 
-    python smoke_test_tl.py
+    python -m tests.smoke_transfer
 
 Moins d'une minute sur CPU. N'écrit rien dans outputs/ (fichier temporaire uniquement).
 Chaque étape affiche OK ou s'arrête avec un message explicite.
@@ -61,7 +61,7 @@ ok(f"device : {DEVICE}")
 step("Données prétraitées")
 for name in ("train", "test_107", "test_130"):
     if not (C.PROCESSED_DIR / f"{name}.npz").exists():
-        fail(f"{C.PROCESSED_DIR / name}.npz absent -> python preprocess.py")
+        fail(f"{C.PROCESSED_DIR / name}.npz absent -> python -m scripts.preprocess")
 if not (C.DATA_DIR / "sample_submission.csv").exists():
     fail(f"{C.DATA_DIR / 'sample_submission.csv'} absent (requis par to_submission)")
 train = load_processed("train")

@@ -1,8 +1,8 @@
-"""Comparaison scientifique des modèles (Personne C), même interface qu'ensemble.py.
+"""Comparaison scientifique des modèles (Personne C), même interface qu'scripts/ensemble.py.
 
-    python -m src.evaluation.compare --runs tl tl_scratch gru gnn --folds group
+    python -m experiments.transfer.compare --runs tl tl_scratch gru gnn --folds group
 
-Lit outputs/<run>/oof.npy et écrit dans report/comparison/ :
+Lit outputs/<run>/oof.npy et écrit dans results/transfer/ :
 main_table.csv, bootstrap.csv, loop_errors_<run>.csv.
 Évaluation sur les molécules fiables (SN_filter = 1) prédites par tous les modèles.
 """
@@ -53,7 +53,7 @@ def main():
     p.add_argument("--folds", default="kfold", choices=["kfold", "group"],
                    help="folds utilisés par les runs (pour les scores par fold)")
     a = p.parse_args()
-    out = C.ROOT / "report" / "comparison"
+    out = C.ROOT / "results" / "transfer"
     out.mkdir(parents=True, exist_ok=True)
 
     train = load_processed("train")

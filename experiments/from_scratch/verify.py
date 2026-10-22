@@ -7,10 +7,10 @@ import sys
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from src import config as C
-from experiments.run_comparison import MATRIX
+from experiments.from_scratch.run import MATRIX
 
 
 def score(targets, predictions):

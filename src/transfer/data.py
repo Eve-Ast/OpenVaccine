@@ -1,6 +1,6 @@
-"""Entrées de la stratégie 2, lues dans data/processed/ (écrit par preprocess.py).
+"""Entrées de la stratégie 2, lues dans data/processed/ (écrit par scripts/preprocess.py).
 
-Mêmes données que train.py. Comme dans le reste du projet, un batch ne contient
+Mêmes données que experiments/from_scratch/train.py. Comme dans le reste du projet, un batch ne contient
 qu'une seule longueur : un « groupe » = un dict de tableaux de même longueur L.
 """
 import numpy as np
