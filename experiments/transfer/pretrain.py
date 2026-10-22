@@ -1,8 +1,8 @@
 """Pré-entraînement MLM de l'encodeur (Stratégie 2, Personne C).
 
-    python pretrain_mlm.py                         # 60 epochs, masquage 15 %
-    python pretrain_mlm.py --span 3 --epochs 80    # span masking
-    python pretrain_mlm.py --epochs 2              # test rapide
+    python -m experiments.transfer.pretrain                         # 60 epochs, masquage 15 %
+    python -m experiments.transfer.pretrain --span 3 --epochs 80    # span masking
+    python -m experiments.transfer.pretrain --epochs 2              # test rapide
 
 Sorties dans outputs/mlm_pretrain/ : encoder.pt (meilleure val_loss), history.csv
 """

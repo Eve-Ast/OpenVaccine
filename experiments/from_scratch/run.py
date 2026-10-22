@@ -1,0 +1,69 @@
+"""Expériences contrôlées sans régénération des folds ni écrasement des résultats.
+
+python -m experiments.from_scratch.run --jobs 2
+Chaque configuration utilise les cinq folds fixes, sans données de test.
+"""
+import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parents[2]
+MATRIX = [
+    ("gru", "seq", {"hidden": 64, "n_layers": 2, "dropout": .2}),
+    ("gru", "annot", {"hidden": 64, "n_layers": 2, "dropout": .2}),
+    ("transformer", "annot", {"d_model": 64, "num_heads": 4, "n_layers": 2, "ff_dim": 128, "dropout": .2}),
+    ("transformer", "graph", {"d_model": 64, "num_heads": 4, "n_layers": 2, "ff_dim": 128, "dropout": .2}),
+    ("gcn", "annot", {"units": 64, "n_layers": 4, "dropout": .2}),
+    ("gcn", "graph", {"units": 64, "n_layers": 4, "dropout": .2}),
+    ("conv_gru", "annot", {"hidden": 64, "n_layers": 2, "dropout": .2, "filters": 64, "kernel_size": 5}),
+    ("attention_gru", "annot", {"hidden": 64, "n_layers": 2, "dropout": .2, "num_heads": 4}),
+    ("gat", "annot", {"units": 64, "num_heads": 4, "n_layers": 4, "dropout": .2}),
+    ("gat", "graph", {"units": 64, "num_heads": 4, "n_layers": 4, "dropout": .2}),
+]
+
+
+def run_config(entry, args, env):
+    model, level, params = entry
+    name = f"cv_{model}_{level}"
+    out = ROOT / 'outputs' / name
+    if (out/'scores.json').exists():
+        saved = json.loads((out/'scores.json').read_text())
+        expected = set(map(str, range(5)))
+        if (set(saved['fold_mcrmse']) == expected and
+            saved['args']['epochs'] == args.epochs and
+            json.loads(saved['args']['params']) == params):
+            print(f'Already completed: {name}', flush=True)
+            return name
+        raise RuntimeError(f'Run incomplet ou configuration différente : {out}')
+    command = [sys.executable, '-B', '-m', 'experiments.from_scratch.train', '--model', model, '--level', level,
+               '--params', json.dumps(params), '--name', name, '--epochs', str(args.epochs),
+               '--patience', '8', '--batch-size', '32', '--optimizer', 'adamw', '--lr', '0.001', '--skip-test']
+    print(f'Starting {name}', flush=True)
+    with (ROOT/'outputs'/f'{name}.log').open('w') as log:
+        subprocess.run(command, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
+    print(f'Completed {name}', flush=True)
+    return name
+
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument('--epochs', type=int, default=40)
+    p.add_argument('--jobs', type=int, choices=[1, 2], default=1)
+    p.add_argument('--select', nargs='+', choices=[f'{m}_{l}' for m,l,_ in MATRIX])
+    args = p.parse_args()
+    env = dict(os.environ, MPLCONFIGDIR='/tmp/openvaccine-mpl')
+    selected = [x for x in MATRIX if not args.select or f'{x[0]}_{x[1]}' in args.select]
+    (ROOT / 'outputs').mkdir(exist_ok=True)
+    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+        futures = [pool.submit(run_config, x, args, env) for x in selected]
+        for f in as_completed(futures):
+            f.result()
+    subprocess.run([sys.executable, '-B', '-m', 'experiments.from_scratch.figures'], cwd=ROOT, env=env, check=True)
+
+
+if __name__ == '__main__':
+    main()

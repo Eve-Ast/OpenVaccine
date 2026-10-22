@@ -1,7 +1,7 @@
 """Encodeur Transformer pré-entraînable (Stratégie 2, PyTorch).
 
 Rangé dans src/transfer/ et PAS dans src/models/ : src/models/ est le registre
-des modèles Keras utilisés par train.py (MODELS), ce modèle-ci est en PyTorch.
+des modèles Keras utilisés par experiments/from_scratch/train.py (MODELS), ce modèle-ci est en PyTorch.
 
 Mêmes entrées que les autres modèles : tokens (vocabulaire global à offsets),
 feats, bpps, pairs. Biais d'attention 2D (BPP + adjacence) ; tête MLM pour le

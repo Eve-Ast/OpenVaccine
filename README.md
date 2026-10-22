@@ -1,157 +1,107 @@
-# OpenVaccine : prédiction de la dégradation de l'ARNm
+# OpenVaccine : prédiction de la dégradation de l’ARN
 
-Projet IA2, sujet 4 : [Kaggle Stanford COVID Vaccine](https://www.kaggle.com/competitions/stanford-covid-vaccine)
+Projet du cours IA2, Master 2 Bioinformatique, Université Paris Cité. À partir des données [Stanford OpenVaccine](https://www.kaggle.com/competitions/stanford-covid-vaccine), nous étudions l’apport des informations structurales et du préentraînement à la prédiction de la réactivité et de la dégradation de l’ARN.
 
-Prédire, pour chaque base d'une molécule d'ARNm, sa réactivité et sa dégradation dans différentes conditions. C'est une régression multi-sorties par position, évaluée en **MCRMSE** sur 3 cibles : `reactivity`, `deg_Mg_pH10` et `deg_Mg_50C`.
+## Organisation
 
-**Question de recherche :** la prise en compte des interactions structurales entre nucléotides améliore-t-elle la prédiction de la dégradation de l'ARN par rapport aux modèles séquentiels ?
+Les trois volets sont séparés dans le code et les figures ; ils partagent les données prétraitées, les folds et la métrique officielle.
 
-Pour y répondre, chaque modèle est entraîné à plusieurs **niveaux d'information structurale** (`--level`) :
+```text
+src/
+  preprocessing/       Encodage et caractéristiques communes
+  evaluation/          Métrique et format de soumission
+  training.py          Utilitaires communs aux entraînements Keras
+  models/              Modèles from scratch (Keras)
+  transfer/            Transformer avec préentraînement MLM (PyTorch)
+  kaggle/              Architecture Kaggle adaptée (Keras)
+experiments/
+  from_scratch/        Entraînement, comparaison et trois figures du rapport
+  transfer/            Préentraînement, fine-tuning et analyses
+  kaggle/              Entraînement et vérification de la reproduction adaptée
+scripts/               Prétraitement commun et ensemble optionnel
+notebooks/             EDA et exécution du transfert sur Colab
+figures/
+  from_scratch/
+  transfer/
+  kaggle/
+results/transfer/      Tableaux de résultats publiés du transfert
+folds/                 Partitions fixes, communes aux trois volets
+outputs/               Résultats locaux et checkpoints, ignorés par Git
+```
 
-| Niveau | Entrées | MLP | Transformer | GCN / GAT |
-|---|---|---|---|---|
-| `seq` | séquence seule | ✓ | ✓ | ✓ (graphe = squelette) |
-| `annot` | + structure, type de boucle, features BPPS par base | ✓ | ✓ | ✓ (graphe = squelette) |
-| `graph` | + interactions entre bases (BPPS, paires) | — | ✓ (biais d'attention) | ✓ (arêtes paires + BPPS) |
-
-L'apport des interactions structurales se lit dans l'écart `annot` → `graph` à architecture égale.
-
-**Répartition des tâches, du rapport et de la soutenance : [docs/REPARTITION.md](docs/REPARTITION.md)**
-
-## Installation
+## Installation et données
 
 ```bash
-git clone <url-du-repo>
-cd OpenVaccine
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Données (non versionnées)
+Pour le volet PyTorch, installer aussi `pip install -r requirements-transfer.txt`.
 
-Les données ne sont pas versionnées. Téléchargez-les depuis Kaggle et placez-les dans `data/` :
-
-```bash
-kaggle competitions download -c stanford-covid-vaccine
-unzip stanford-covid-vaccine.zip -d data/
-```
-
-```
-data/
-├── train.json         (train.json.zip est aussi accepté)
-├── test.json
-├── sample_submission.csv
-└── bpps/              (6034 fichiers .npy)
-```
-
-### Prétraitement (à lancer une fois)
+Télécharger les données Kaggle dans `data/` : `train.json`, `test.json`, `sample_submission.csv` et les matrices dans `bpps/`. Les JSON compressés en `.json.zip` sont acceptés.
 
 ```bash
-python preprocess.py
+python -m scripts.preprocess
 ```
 
-Vérifie les données et écrit `outputs/preprocessing_report.json`. Le rapport contient les valeurs manquantes, les vocabulaires, la validité des structures, les BPPS, les statistiques des cibles et le bruit. Le script crée ensuite les données prétraitées dans `data/processed/`, utilisées par `train.py` et `ensemble.py` :
+Le prétraitement écrit `train.npz`, `test_107.npz` et `test_130.npz` dans `data/processed/`. Il encode la séquence, la structure et le type de boucle, puis calcule quatre caractéristiques par nucléotide : somme, maximum et entropie BPPS, distance au partenaire. Les cibles et les affectations de `folds/` sont conservées.
 
-| Donnée brute | Prétraitement | Clé dans les `.npz` |
-|---|---|---|
-| `sequence`, `structure`, `predicted_loop_type` | Tokens (pour l'Embedding) et one-hot (14 dims) | `tokens`, `onehot` |
-| `bpps` | Matrice complète + features par base : somme, max, entropie | `bpps`, `feats` |
-| `structure` | Index de la base appariée, distance à la paire | `pairs`, `feats` |
-| `reactivity`, `deg_*` | Vérifiées, non modifiées ; loss masquée sur les 68 premières bases | `targets`, `errors` |
-| `signal_to_noise`, `SN_filter` | Conservés ; les molécules bruitées sont exclues à l'entraînement et toujours en validation | `signal_to_noise`, `sn_filter` |
-| Split train/validation | 5 folds fixés (KFold et GroupKFold) | `fold_kfold`, `fold_group` |
+## 1. Modèles from scratch
 
-Le test contient deux longueurs (107 et 130), d'où deux fichiers : `test_107.npz` et `test_130.npz`.
-
-## Architecture
-
-Le projet suit trois étapes. Chaque étape a **un seul script** à la racine, et son code dans **un dossier dédié** de `src/` :
-
-| Étape | Script | Code | Entrée → sortie |
-|---|---|---|---|
-| 1. Prétraitement | `preprocess.py` | `src/preprocessing/` | `data/*.json`, `data/bpps/` → `data/processed/*.npz` + rapport |
-| 2. Modélisation | `train.py` | `src/models/` | `data/processed/` → `outputs/<run>/` |
-| 3. Évaluation | `ensemble.py` | `src/evaluation/` | `outputs/<run>/` → `outputs/ensemble/` |
-
-```
-OpenVaccine/
-├── preprocess.py            ÉTAPE 1 : vérification + données prétraitées
-├── train.py                 ÉTAPE 2 : entraînement en validation croisée (tous les modèles)
-├── ensemble.py              ÉTAPE 3 : moyenne pondérée des modèles
-│
-├── src/
-│   ├── config.py            constantes partagées (chemins, cibles, vocabulaires, seed)
-│   │
-│   ├── preprocessing/       ── étape 1
-│   │   ├── data.py          lecture JSON/BPPS, encodage (tokens, one-hot), lecture des .npz
-│   │   ├── features.py      features par base (BPPS, distance à la paire)
-│   │   └── folds.py         split train/validation (KFold, GroupKFold)
-│   │
-│   ├── models/              ── étape 2 (un fichier par modèle)
-│   │   ├── common.py        entrées, embedding, niveaux seq / annot / graph
-│   │   ├── graph.py         graphe de l'ARN (squelette, paires, BPPS) pour GCN et GAT
-│   │   ├── mean.py          référence naïve : moyenne par position
-│   │   ├── mlp.py           Modèle 1 : MLP
-│   │   ├── transformer.py   Modèle 2 : Transformer Encoder (+ biais BPPS)
-│   │   ├── gcn.py           Modèle 3 : GCN (option R-GCN)
-│   │   └── gat.py           Modèle 4 (optionnel) : GAT
-│   │
-│   └── evaluation/          ── étape 3
-│       ├── metrics.py       MCRMSE (métrique) et loss masquée
-│       └── submission.py    format de soumission Kaggle
-│
-├── data/                    (non versionné) données brutes + data/processed/
-├── folds/                   folds fixés, communs à l'équipe (créés une seule fois)
-├── outputs/                 (non versionné) un dossier par run : scores, courbes, prédictions
-├── notebooks/               EDA, analyses, figures du rapport
-├── report/                  rapport et slides
-└── docs/                    répartition des tâches
-```
-
-## Utilisation
+Six architectures sont comparées : BiGRU (baseline), Conv1D + BiGRU, BiGRU + Attention, Transformer, GCN et GAT. Les entrées `annot` sont communes aux six modèles. BiGRU est aussi évalué en `seq` (séquence seule) ; Transformer, GCN et GAT en `graph` (ajout des interactions explicites), soit dix configurations.
 
 ```bash
-python preprocess.py                                 # une fois (et après chaque modif. de features.py)
-python train.py --model mean                         # référence naïve
-python train.py --model mlp --level annot            # Modèle 1   -> outputs/mlp_annot/
-python train.py --model transformer --level annot    # Modèle 2, sans interactions
-python train.py --model transformer --level graph    # Modèle 2, attention biaisée par la BPPS
-python train.py --model gcn --level annot            # Modèle 3, graphe = squelette seul
-python train.py --model gcn --level graph            # Modèle 3, + paires et BPPS
-python train.py --model gat --level graph            # Modèle 4 (optionnel)
-python ensemble.py --runs mlp_annot transformer_graph gcn_graph
-
-# Test rapide : un seul fold, quelques époques
-python train.py --model gat --level graph --only-fold 0 --epochs 3 --name test
-
-# Hyperparamètres et optimiseurs (étude d'optimisation)
-python train.py --model transformer --level graph --optimizer nesterov --lr 1e-2 --batch-size 32 --name transformer_nesterov
-python train.py --model gcn --level graph --params '{"relational": true}' --name rgcn_graph
+python -m experiments.from_scratch.run --jobs 2
+python -m experiments.from_scratch.verify
+python -m experiments.from_scratch.figures
 ```
 
-Chaque run écrit dans `outputs/<name>/` :
+Les expériences utilisent cinq folds fixes, la seed 42, `SN_filter = 1`, AdamW à 0,001, des lots de 32 et au maximum 40 époques, avec arrêt anticipé après huit époques sans amélioration du MCRMSE officiel. Le test n’intervient pas dans l’apprentissage.
 
-| Fichier | Contenu | Utilisé pour |
-|---|---|---|
-| `scores.json` | MCRMSE CV, RMSE par cible, paramètres | tableau de résultats |
-| `history_fold*.csv` | courbes de loss train / val | figures du rapport |
-| `oof.npy` | prédictions out-of-fold | ensembling, analyse d'erreurs |
-| `submission.csv` | prédictions test | Kaggle |
+**Résultats :** BiGRU annot obtient **0,24933 ± 0,00553**, suivi de Conv1D + BiGRU à **0,25108 ± 0,00546**. Les annotations réduisent l’erreur moyenne du BiGRU d’environ 19 % par rapport à la séquence seule. Les interactions explicites n’améliorent pas les configurations testées.
 
-Toutes les entrées ont une longueur `L` variable : 107 en train, 107 ou 130 en test. Chaque modèle reçoit un dictionnaire :
+![Comparaison des six architectures avec les entrées annot](figures/from_scratch/cv_architectures.png)
 
-- `tokens` (L, 3) : base, structure, type de boucle
-- `feats` (L, F) : features numériques
-- `bpps` (L, L) : matrice BPPS
-- `pairs` (L,) : index de la base appariée
+Les deux figures complémentaires du rapport sont dans le même dossier : [apport des informations structurales](figures/from_scratch/cv_structure.png) et [erreur par cible](figures/from_scratch/cv_targets.png).
 
-Chaque modèle prédit (L, 5). La loss n'utilise que les 68 premières positions.
+## 2. Préentraînement MLM et fine-tuning
 
-## Workflow Git
+Un Transformer avec biais structuraux apprend à reconstruire des nucléotides masqués, puis prédit les cinq cibles expérimentales. Le même modèle initialisé aléatoirement sert de contrôle pour mesurer l’apport du préentraînement. Aucun modèle de fondation externe n’est utilisé.
 
-- Une branche par personne : `p1-data`, `p2-sequence`, `p3-graph`. On fusionne dans `main` via Pull Request.
-- Les fichiers communs (`src/config.py`, `src/preprocessing/`, `src/evaluation/`) appartiennent à P1. Toute modification se fait par PR, prévenez le groupe.
-- Pour ajouter une feature : modifiez `src/preprocessing/features.py` (fonction + nom dans `FEATURE_NAMES`), puis relancez `python preprocess.py`. Elle arrive automatiquement dans l'entrée `feats` de tous les modèles.
-- Ne jamais committer `data/` ni `outputs/`. Partagez les scores dans le tableau de résultats du rapport.
-- `folds/*.csv` sont figés : ne pas les régénérer, sinon les scores ne sont plus comparables.
+```bash
+python -m experiments.transfer.pretrain --epochs 100
+python -m experiments.transfer.finetune
+python -m experiments.transfer.finetune --ckpt none
+python -m experiments.transfer.compare --runs tl tl_scratch mean
+python -m experiments.transfer.figures
+```
+
+La comparaison avec `mean` nécessite ce contrôle : `python -m experiments.from_scratch.train --model mean --name mean`. Le notebook [`Run_transfert.ipynb`](notebooks/Run_transfert.ipynb) contient aussi les expériences avec 25 % et 50 % des données étiquetées.
+
+**Résultats publiés :** MCRMSE OOF **0,25615** avec préentraînement et **0,25442** sans préentraînement à 100 % des données. Le préentraînement n’améliore donc pas le score dans cette configuration. L’accuracy du MLM mesure la reconstruction des bases, pas la qualité de la prédiction de dégradation.
+
+![Effet du préentraînement selon la quantité de données étiquetées](figures/transfer/fig_learning_curves.png)
+
+## 3. Adaptation d’une solution Kaggle
+
+Nous adaptons le notebook de [mrkmakr, « AE pretrain + GNN + Attn + CNN »](https://www.kaggle.com/code/mrkmakr/covid-ae-pretrain-gnn-attn-cnn) : autoencodeur débruiteur, convolutions, agrégation sur graphe et attention. Il s’agit d’une architecture communautaire, pas de l’ensemble final du gagnant.
+
+```bash
+python -m experiments.kaggle.train
+python -m experiments.kaggle.verify
+```
+
+Pour cette comparaison, l’autoencodeur est préentraîné séparément sur le train de chaque fold, sans entrées de validation ou de test. Les mêmes 1 589 ARN fiables et les mêmes folds que nos modèles sont utilisés. Les adaptations et la source exacte sont décrites dans [`experiments/kaggle/README.md`](experiments/kaggle/README.md).
+
+**Résultats :** MCRMSE moyenne **0,22657 ± 0,00539** sur cinq folds ; MCRMSE OOF **0,22663**. Cette adaptation obtient une erreur plus faible que notre baseline BiGRU, avec des caractéristiques différentes et 20 époques supplémentaires de préentraînement par fold.
+
+![Adaptation Kaggle et baseline BiGRU sur les mêmes cinq folds](figures/kaggle/cv_comparison.png)
+
+## Évaluation et limites
+
+Chaque modèle prédit cinq cibles sur les 68 positions mesurées. Le MCRMSE officiel porte sur trois cibles : `reactivity`, `deg_Mg_pH10` et `deg_Mg_50C` ; plus bas est meilleur. Les valeurs « moyenne ± écart-type » décrivent les cinq folds, tandis que le score OOF regroupe toutes leurs prédictions.
+
+Les nombres de paramètres, caractéristiques et budgets diffèrent entre volets. Le MLM utilise les entrées de train et de test sans leurs labels, contrairement à notre adaptation Kaggle. Son fine-tuning sélectionne le checkpoint sur les cinq cibles, contre les trois cibles officielles pour les deux autres volets. Les scores comparent donc des pipelines ; ils n’isolent pas uniquement l’effet des architectures. Une seule seed est étudiée et KFold ne garantit pas la séparation des séquences similaires.
+
+Les historiques, poids et prédictions restent dans `outputs/`. Les tests Keras se lancent avec `python -m unittest discover -s tests -v` ; le test du transfert avec `python -m tests.smoke_transfer`.

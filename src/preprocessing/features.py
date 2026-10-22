@@ -1,8 +1,4 @@
-"""Feature engineering par base (Personne 1).
-
-Ajouter ici les nouvelles features (et leur nom dans FEATURE_NAMES) : elles
-arrivent automatiquement dans l'entrée `feats` de tous les modèles.
-"""
+"""Quatre caractéristiques par nucléotide : somme, maximum, entropie BPPS et distance."""
 import numpy as np
 
 FEATURE_NAMES = ["bpp_sum", "bpp_max", "bpp_entropy", "pair_distance"]
@@ -15,6 +11,8 @@ def pair_index(structure):
         if c == "(":
             stack.append(i)
         elif c == ")":
+            if not stack:
+                raise ValueError("structure non équilibrée")
             j = stack.pop()
             pairs[i], pairs[j] = j, i
     if stack:
@@ -35,15 +33,9 @@ def bpps_features(bpps):
     return np.stack([s, m, entropy], axis=-1)
 
 
-def pair_distance(df):
-    """(N, L, 1) : distance |i - j| / L à la base appariée (0 si non appariée)."""
-    out = []
-    for s in df.structure:
-        p = np.asarray(pair_index(s))
-        d = np.where(p >= 0, np.abs(np.arange(len(s)) - p), 0) / len(s)
-        out.append(d)
-    return np.asarray(out, dtype="float32")[..., None]
-
-
-def base_features(df, bpps):
-    return np.concatenate([bpps_features(bpps), pair_distance(df)], axis=-1).astype("float32")
+def base_features(pairs, bpps):
+    """Concaténer les trois statistiques BPPS et la distance au partenaire."""
+    length = pairs.shape[1]
+    distance = np.where(pairs >= 0, np.abs(np.arange(length) - pairs), 0) / length
+    distance = distance.astype('float32')[..., None]
+    return np.concatenate([bpps_features(bpps), distance], axis=-1).astype('float32')

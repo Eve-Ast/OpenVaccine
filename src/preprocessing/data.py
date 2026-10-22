@@ -46,7 +46,10 @@ def encode_tokens(df):
 
 def load_bpps(ids):
     """(N, L, L) : matrices de probabilité d'appariement."""
-    return np.asarray([np.load(C.BPPS_DIR / f"{i}.npy") for i in ids], dtype="float32")
+    bpps = np.asarray([np.load(C.BPPS_DIR / f"{i}.npy") for i in ids], dtype="float32")
+    if not np.isfinite(bpps).all() or bpps.min() < 0 or bpps.max() > 1 + 1e-6:
+        raise ValueError("BPPS : valeurs manquantes ou hors de [0, 1]")
+    return bpps
 
 
 def build_inputs(df):
@@ -61,12 +64,13 @@ def build_inputs(df):
     assert df.seq_length.nunique() == 1, "grouper les molécules par longueur"
     bpps = load_bpps(df.id)
     tokens = encode_tokens(df)
+    pairs = np.asarray([pair_index(s) for s in df.structure], dtype="int32")
     return {
         "tokens": tokens,
         "onehot": one_hot(tokens),
-        "feats": base_features(df, bpps),
+        "feats": base_features(pairs, bpps),
         "bpps": bpps,
-        "pairs": np.asarray([pair_index(s) for s in df.structure], dtype="int32"),
+        "pairs": pairs,
     }
 
 
@@ -90,13 +94,13 @@ def build_errors(df):
 
 
 # ------------------------------------------------------------------
-# Données prétraitées (écrites par preprocess.py)
+# Données prétraitées (écrites par scripts/preprocess.py)
 # ------------------------------------------------------------------
 def load_processed(name):
     """name = 'train', 'test_107' ou 'test_130' -> dict de tableaux numpy."""
     path = C.PROCESSED_DIR / f"{name}.npz"
     if not path.exists():
-        raise FileNotFoundError(f"{path} absent : lancer d'abord `python preprocess.py`")
+        raise FileNotFoundError(f"{path} absent : lancer d'abord `python -m scripts.preprocess`")
     with np.load(path, allow_pickle=False) as z:
         return {k: z[k] for k in z.files}
 

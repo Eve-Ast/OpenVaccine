@@ -1,7 +1,7 @@
 """Ensembling (Personne 3) : moyenne pondérée des modèles entraînés.
 
 Les poids sont optimisés sur les prédictions OOF (pas sur le test !).
-    python ensemble.py --runs gru conv_gru transformer gnn
+    python -m scripts.ensemble --runs gru conv_gru transformer gnn
 """
 import argparse
 import json

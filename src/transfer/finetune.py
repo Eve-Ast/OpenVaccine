@@ -1,4 +1,4 @@
-"""Fine-tuning en validation croisée, calqué ligne à ligne sur train.py.
+"""Fine-tuning du Transformer MLM sur les folds communs du projet.
 
 Identique à train.py : données prétraitées, folds (--folds), molécules d'entraînement
 (SN_filter = 1 sauf --all-samples), validation sur SN_filter = 1, loss MCRMSE sur les
@@ -13,6 +13,9 @@ Option --rnafm : ajoute en entrée les embeddings du modèle de fondation RNA-FM
 (extract_rnafm.py). Avec --ckpt none, c'est le transfert depuis RNA-FM seul (tl_rnafm).
 La projection RNA-FM est une couche neuve : elle n'est jamais gelée et apprend au
 learning rate de la tête.
+Loss sur cinq cibles ; checkpoint et arrêt anticipé sélectionnés sur la
+validation à cinq cibles. Le score officiel à trois cibles est aussi enregistré.
+L'encodeur préentraîné peut être gelé au début et utilise un learning rate séparé.
 """
 import copy
 import json
@@ -73,7 +76,7 @@ def run(args):
     seed_all()
     rng = np.random.default_rng(C.SEED)
 
-    # données prétraitées par preprocess.py (comme train.py)
+    # données prétraitées par scripts/preprocess.py (comme experiments/from_scratch/train.py)
     train = load_processed("train")
     X, Y = load_inputs("train", rnafm=use_rnafm), train["targets"]
     fold = train[f"fold_{args.folds}"]
@@ -106,12 +109,18 @@ def run(args):
             if unexpected or any(not m.startswith("rnafm_proj.") for m in missing):
                 raise RuntimeError(f"checkpoint incompatible : manquants {missing}, inattendus {unexpected}")
         model = RegModel(enc).to(DEVICE)
+<<<<<<< HEAD
         lr_enc = args.lr_enc if pretrained else args.lr   # sans pré-entraînement : protocole train.py
         new = list(model.enc.rnafm_proj.parameters()) if model.enc.rnafm_proj is not None else []
         new_ids = {id(p) for p in new}
         enc_params = [p for p in model.enc.parameters() if id(p) not in new_ids]
         opt = torch.optim.Adam([{"params": enc_params, "lr": lr_enc},
                                 {"params": list(model.head.parameters()) + new, "lr": args.lr}])
+=======
+        lr_enc = args.lr_enc if pretrained else args.lr   # sans pré-entraînement : protocole experiments/from_scratch/train.py
+        opt = torch.optim.Adam([{"params": model.enc.parameters(), "lr": lr_enc},
+                                {"params": model.head.parameters(), "lr": args.lr}])
+>>>>>>> upstream/main
         plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(   # = keras ReduceLROnPlateau
             opt, factor=0.5, patience=max(1, args.patience // 2), threshold=1e-4, threshold_mode="abs")
         best, best_state, wait, history = float("inf"), None, 0, []

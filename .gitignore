@@ -14,3 +14,7 @@ __pycache__/
 
 # macOS
 .DS_Store
+
+# Notes locales et archives de partage
+/docs/
+/exports/

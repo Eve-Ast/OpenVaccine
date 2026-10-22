@@ -2,8 +2,8 @@
 
 scores = Q K^T / sqrt(d) + w_h * BPPS     (un poids w_h appris par tête)
 
-La BPPS joue le rôle de la « pair representation » d'AlphaFold2 : elle indique
-au modèle quelles positions interagissent en 3D.
+La BPPS décrit des probabilités d'appariement de structure secondaire ;
+elle ne représente pas une structure 3D mesurée.
 """
 import keras
 from keras import layers, ops
@@ -27,12 +27,15 @@ class BppsAttention(layers.Layer):
     def __init__(self, d_model, num_heads, use_bpps=True, **kwargs):
         super().__init__(**kwargs)
         self.d_model, self.h, self.use_bpps = d_model, num_heads, use_bpps
+        if d_model % num_heads:
+            raise ValueError("d_model doit être divisible par num_heads")
         self.dk = d_model // num_heads
         self.qkv = layers.Dense(3 * d_model)
         self.out = layers.Dense(d_model)
 
     def build(self, input_shape):
-        self.bpps_weight = self.add_weight(shape=(self.h,), initializer="ones", name="bpps_weight")
+        if self.use_bpps:
+            self.bpps_weight = self.add_weight(shape=(self.h,), initializer="ones", name="bpps_weight")
 
     def call(self, x, bpps=None):
         B, L = ops.shape(x)[0], ops.shape(x)[1]
@@ -49,6 +52,8 @@ class BppsAttention(layers.Layer):
 def build_model(n_feats, level="graph", embed_dim=32, d_model=128, num_heads=8, n_layers=4,
                 ff_dim=256, dropout=0.1):
     """level = "graph" : la BPPS biaise l'attention ; sinon self-attention classique."""
+    if d_model % 2:
+        raise ValueError("d_model doit être pair pour l'encodage sinusoïdal")
     inputs = model_inputs(n_feats)
     use_bpps = level == "graph"
     x = layers.Dense(d_model)(embed(inputs, embed_dim, level))
