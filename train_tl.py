@@ -5,6 +5,8 @@ Mêmes options et mêmes sorties que train.py -> compatible avec ensemble.py.
     python train_tl.py --folds group --ckpt none              # ablation : même archi sans pré-entraînement -> outputs/tl_scratch/
     python train_tl.py --folds group --label-frac 0.25 --name tl_25
     python train_tl.py --only-fold 0 --epochs 2               # test rapide
+    python train_tl.py --rnafm --ckpt none                    # RNA-FM gelé seul -> outputs/tl_rnafm/
+    python train_tl.py --rnafm                                # MLM + RNA-FM -> outputs/tl_mlm_rnafm/
 
 Sorties dans outputs/<name>/ : oof.npy, submission.csv, scores.json, history_fold*.csv, model_fold*.pt
 """
@@ -29,6 +31,8 @@ def parse_args():
     # ---- options propres au transfer learning
     p.add_argument("--ckpt", default=str(DEFAULT_CKPT), help="encodeur pré-entraîné, ou 'none'")
     p.add_argument("--lr-enc", type=float, default=1e-4, help="lr de l'encodeur pré-entraîné")
+    p.add_argument("--rnafm", action="store_true",
+                   help="ajouter les embeddings RNA-FM gelés (lancer extract_rnafm.py avant)")
     p.add_argument("--freeze-epochs", type=int, default=3, help="epochs avec encodeur gelé")
     p.add_argument("--label-frac", type=float, default=1.0, help="fraction des molécules d'entraînement")
     p.add_argument("--sn-weight", action="store_true", help="pondérer la loss par le signal/bruit")
